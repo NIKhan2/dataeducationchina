@@ -1,0 +1,540 @@
+# install.packages("ggplot2")
+library(ggplot2)
+library(readxl)
+library(Rlibeemd)
+#Importing Data
+library(readxl)
+china_education_data <- read_excel("C:/Users/Ali/Desktop/Desktop3/Sports Project/china education data.xlsx")
+View(china_education_data)
+Date=china_education_data$Year
+exp=china_education_data$`Expenditure (% of GDP)`
+# Calculate mean and standard deviation
+mean_data <- mean(exp)
+sd_data <- sd(exp)
+# Calculate Coefficient of Variation (CV)
+cv <- (sd_data / mean_data) * 100
+print(paste("Coefficient of Variation (CV):", cv))
+install.packages("moments")
+library(moments)
+k<-kurtosis(exp)
+df1=data.frame(Date,exp)
+# Create a ggplot
+ggplot(df1, aes(x = Date, y = exp)) +
+  geom_line() +
+  labs(title = "",
+       x = "Date (Year)",
+       y = "Expense on Education (% of GDP)")
+#Descriptive Statistics
+summary(df1)
+var(df1$exp)
+install.packages("DescTools")
+library(DescTools)
+install.packages("Rlibeemd")
+library(Rlibeemd)
+e=emd(exp)
+plot(e)
+imf1=e[,1]
+imf2=e[,2]
+imf3=e[,3]
+imf4=e[,4]
+Resid=e[,5]
+#Moments and CV
+mean_data <- mean(Resid)
+sd_data <- sd(Resid)
+# Calculate Coefficient of Variation (CV)
+cv <- (sd_data / mean_data) * 100
+print(paste("Coefficient of Variation (CV):", cv))
+#Kurtosis
+k<-kurtosis(Resid)
+DF2=data.frame(Date,exp,imf1,imf2,imf3,imf4,Resid)
+#Descriptive Statistics of IMFs
+summary(DF2)
+library(tidyr)
+library(reshape2)
+df_long <- gather(DF2, key = "Variable", value = "Value", -Date)
+# Converting data into data.frame
+df_long$Date <- as.Date(df_long$Date)
+# Plotting using ggplot2
+# Define the order of the variables
+variable_order <- c(paste0("imf", 1:4), "Resid")
+# Convert Variable to a factor with defined levels for desired order
+df_long$Variable <- factor(df_long$Variable, levels = variable_order)
+ggplot(df_long, aes(x = Date, y = Value)) +
+  geom_line() +
+  facet_wrap(~Variable, scales = "free_y", ncol = 2, nrow(2)) +
+  labs(title = "",
+       x = "Date (Years)",
+       y = "Values") +
+  theme_minimal()+
+  theme(panel.border = element_rect(color = "black", fill = NA, size = 1),
+        panel.spacing = unit(1, "lines"),
+        strip.background = element_blank(),
+        strip.text = element_text(color = "black"))
+# Install and load the e1071 package
+install.packages("e1071")
+library(e1071)
+# 1 SVM
+# Split the data into 80% training and 20% testing
+n <- nrow(DF2)
+train_size <- floor(0.8 * n)
+train_indices <- 1:train_size
+test_indices <- (train_size + 1):n
+
+train_data <- DF2[train_indices, ]
+test_data <- DF2[test_indices, ]
+library(caret)
+# Train the Support Vector Regression (SVR) model
+svr_model <- svm(exp ~ ., data = train_data, kernel = "linear", cost = 1, gamma = 1)
+# Make predictions on the test set
+predictions <- predict(svr_model, newdata = test_data)
+# Evaluate the performance (you can use other metrics based on your needs)
+rmse <- sqrt(mean((predictions - test_data$exp)^2))
+mae <- mean(abs(predictions - test_data$exp))
+mape <- mean(abs((predictions - test_data$exp) / test_data$exp)) * 100
+# Print the evaluation metrics
+cat("RMSE:", rmse, "\n")
+cat("MAE:", mae, "\n")
+cat("MAPE:", mape, "%\n")
+#R-Square, NSE, KG
+Actual<-test_data$exp
+Dates<-test_data$Date
+Pred<-predictions
+Df<-data.frame(Dates,Actual,Pred)
+install.packages("hydroGOF")
+library(hydroGOF)
+# Coefficient of Determination (R²)
+r_squared <- summary(lm(Pred ~ Actual))$r.squared
+# Nash-Sutcliffe Efficiency (NSE)
+nse <- NSE(Pred, Actual)
+# Kling-Gupta Efficiency (KGE)
+kge <- KGE(Pred, Actual)
+# Print the metrics
+cat("R-squared:", r_squared, "\n")
+cat("NSE:", nse, "\n")
+cat("KGE:", kge, "\n")
+#Plot
+Dates<-test_data$Date
+Actual<-test_data$exp
+Pred<-predictions
+Df<-data.frame(Dates,Actual,Pred)
+# Plotting the data
+ggplot(Df, aes(x = Dates)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Pred, color = "Predicted")) +
+  labs(x = "Year", y = "Expense on Education (% of GDP)", color = "Legend") +
+  scale_color_manual(values = c("Actual" = "red", "Predicted" = "blue")) +
+  theme_minimal()
+#2 Random Forest 
+install.packages("quantmod")
+install.packages("randomForest")
+library(quantmod)
+library(randomForest)
+rf_model <- randomForest(exp ~ ., data = train_data)
+pred1 <- predict(rf_model, newdata = test_data)
+# Plot using ggplot2
+ggplot(Df, aes(x = Dates)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = pred1, color = "Predicted")) +
+  labs(x = "Year", y = "Expense on Education (% of GDP)", color = "Legend") +
+  scale_color_manual(values = c("Actual" = "red", "Predicted" = "blue")) +
+  theme_minimal()
+# Evaluate the performance
+rmse <- sqrt(mean((pred1 - test_data$exp)^2))
+mae <- mean(abs(pred1 - test_data$exp))
+mape <- mean(abs((pred1 - test_data$exp) / test_data$exp)) * 100
+# Print the evaluation metrics
+cat("RMSE:", rmse, "\n")
+cat("MAE:", mae, "\n")
+cat("MAPE:", mape, "%\n")
+# Coefficient of Determination (R²)
+r_squared <- summary(lm(pred1 ~ Actual))$r.squared
+# Nash-Sutcliffe Efficiency (NSE)
+nse <- NSE(pred1, Actual)
+# Kling-Gupta Efficiency (KGE)
+kge <- KGE(pred1, Actual)
+# Print the metrics
+cat("R-squared:", r_squared, "\n")
+cat("NSE:", nse, "\n")
+cat("KGE:", kge, "\n")
+# 3 Decision tree model 
+library(rpart)
+dt_model <- rpart(exp ~ ., data = train_data)
+pred2 <- predict(dt_model, newdata = test_data)
+# Evaluate the performance (you can use other metrics based on your needs)
+rmse <- sqrt(mean((pred2 - test_data$exp)^2))
+mae <- mean(abs(pred2 - test_data$exp))
+mape <- mean(abs((pred2 - test_data$exp) / test_data$exp)) * 100
+# Print the evaluation metrics
+cat("RMSE:", rmse, "\n")
+cat("MAE:", mae, "\n")
+cat("MAPE:", mape, "%\n")
+# Plot using ggplot2
+ggplot(Df, aes(x = Dates)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = pred2, color = "Predicted")) +
+  labs(x = "Year", y = "Expense on Education (% of GDP)", color = "Legend") +
+  scale_color_manual(values = c("Actual" = "red", "Predicted" = "blue")) +
+  theme_minimal()
+# Coefficient of Determination (R²)
+r_squared <- summary(lm(pred2 ~ test_data$exp))$r.squared
+# Nash-Sutcliffe Efficiency (NSE)
+nse <- NSE(pred2, Actual)
+# Kling-Gupta Efficiency (KGE)
+kge <- KGE(pred2, Actual)
+# Print the metrics
+cat("R-squared:", r_squared, "\n")
+cat("NSE:", nse, "\n")
+cat("KGE:", kge, "\n")
+# 4 ANN
+# Install and load required packages
+install.packages("neuralnet")
+library(neuralnet)
+# Split the data into training and testing sets (80% training, 20% testing)
+# Define the formula for the neural network
+formula <- as.formula("exp ~ imf1 + imf2 + imf3 + imf4 + Resid")
+# Train the neural network model
+nn_model <- neuralnet(formula, data = train_data, hidden = 1, linear.output = TRUE, algorithm = "rprop+",stepmax = 1e+05)
+# Make predictions on the test set
+pred3 <- predict(nn_model, newdata = test_data)
+# Evaluate the model performance
+# You can use appropriate evaluation metrics based on your problem (e.g., Mean Squared Error, Mean Absolute Error, etc.)
+# Here, I'm using Mean Absolute Percentage Error (MAPE) as an example.
+# Evaluate the performance (you can use other metrics based on your needs)
+rmse <- sqrt(mean((pred3 - test_data$exp)^2))
+mae <- mean(abs(pred3 - test_data$exp))
+mape <- mean(abs((pred3 - test_data$exp) / test_data$exp)) * 100
+# Print the evaluation metrics
+cat("RMSE:", rmse, "\n")
+cat("MAE:", mae, "\n")
+cat("MAPE:", mape, "%\n")
+
+# Plot using ggplot2
+ggplot(Df, aes(x = Dates)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = pred3, color = "Predicted")) +
+  labs(x = "Year", y = "Expense on Education (% of GDP)", color = "Legend") +
+  scale_color_manual(values = c("Actual" = "red", "Predicted" = "blue")) +
+  theme_minimal()
+library(hydroGOF)
+length(pred3)
+length(test_data$exp)
+# Coefficient of Determination (R²)
+r_squared <- summary(lm(pred3 ~ Actual))$r.squared
+# Nash-Sutcliffe Efficiency (NSE)
+nse <- NSE(pred3, test_data$exp)
+# Kling-Gupta Efficiency (KGE)
+kge <- KGE(pred3, Actual)
+# Print the metrics
+cat("R-squared:", r_squared, "\n")
+cat("NSE:", nse, "\n")
+cat("KGE:", kge, "\n")
+# Install and load the hydroGOF package if not already installed
+install.packages("hydroGOF")
+library(hydroGOF)
+
+# Convert to vectors if they are not
+pred3 <- as.vector(pred3)
+test_data_exp <- as.vector(test_data$exp)
+
+# Ensure they have the same length
+if (length(pred3) == length(test_data_exp)) {
+  # Calculate NSE
+  nse <- NSE(pred3, test_data_exp)
+  print(paste("NSE:", nse))
+  
+  # Calculate KGE
+  kge <- KGE(pred3, test_data_exp)
+  print(paste("KGE:", kge))
+  
+  # Calculate R2
+  r2 <- cor(test_data_exp, pred3)^2
+  print(paste("R2:", r2))
+} else {
+  stop("The dimensions of the predicted and observed data do not match.")
+}
+
+#4 KNN Model
+install.packages("class")
+library(class)
+k <- 5  # You can adjust the value of k
+knn_model <- knn(train = train_data[, -1], test = test_data[, -1], cl = train_data$exp, k = k)
+# Convert factor to numeric
+knn_model_numeric <- as.numeric(as.character(knn_model))
+pred4<-knn_model_numeric
+pred4
+# Calculate MAE and RMSE
+rmse <- sqrt(mean((knn_model_numeric - test_data$exp)^2))
+mae <- mean(abs(knn_model - test_data$exp))
+mape <- mean(abs((knn_model_numeric - test_data$exp) / test_data$exp)) * 100
+#Ploting
+ggplot(Df, aes(x = Dates)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = pred4, color = "Predicted")) +
+  labs(x = "Year", y = "Expense on Education (% of GDP)", color = "Legend") +
+  scale_color_manual(values = c("Actual" = "red", "Predicted" = "blue")) +
+  theme_minimal()
+# Coefficient of Determination (R²)
+r_squared <- summary(lm(pred4 ~ Actual))$r.squared
+# Nash-Sutcliffe Efficiency (NSE)
+nse <- NSE(pred4, test_data$exp)
+# Kling-Gupta Efficiency (KGE)
+kge <- KGE(pred4, Actual)
+# Print the metrics
+cat("R-squared:", r_squared, "\n")
+cat("NSE:", nse, "\n")
+cat("KGE:", kge, "\n")
+# Install and load the hydroGOF package if not already installed
+install.packages("hydroGOF")
+library(hydroGOF)
+
+# Convert to vectors if they are not
+pred4 <- as.vector(pred4)
+test_data_exp <- as.vector(test_data$exp)
+
+# Ensure they have the same length
+if (length(pred4) == length(test_data_exp)) {
+  # Calculate NSE
+  nse <- NSE(pred4, test_data_exp)
+  print(paste("NSE:", nse))
+  
+  # Calculate KGE
+  kge <- KGE(pred4, test_data_exp)
+  print(paste("KGE:", kge))
+  
+  # Calculate R2
+  r2 <- cor(test_data_exp, pred4)^2
+  print(paste("R2:", r2))
+} else {
+  stop("The dimensions of the predicted and observed data do not match.")
+}
+
+####################################################
+#4. naive base
+nb_model <- naiveBayes(exp ~ ., data = train_data)
+pred5 <- predict(nb_model, test_data$exp)
+length(pred5)
+# Convert factors to numeric
+test_data$exp <- as.numeric(as.character(test_data$exp))
+pred6 <- as.numeric(as.character(pred5))
+# Evaluate the model
+rmse <- sqrt(mean((pred6 - test_data$exp)^2))
+mae <- mean(abs(pred6 - test_data$exp))
+mape <- mean(abs((pred6 - test_data$exp) / test_data$exp)) * 100
+# Print the evaluation metrics
+cat("RMSE:", rmse, "\n")
+cat("MAE:", mae, "\n")
+cat("MAPE:", mape, "%\n")
+# Coefficient of Determination (R²)
+r_squared <- summary(lm(pred6 ~ Actual))$r.squared
+# Nash-Sutcliffe Efficiency (NSE)
+nse <- NSE(pred6, Actual)
+# Kling-Gupta Efficiency (KGE)
+length(pred6)
+length(Actual)
+df<-data.frame(pred6,Actual)
+# Install and load the hydroGOF package if not already installed
+install.packages("hydroGOF")
+library(hydroGOF)
+
+# Define the vectors
+pred6 <- c(1.38874, 1.38874, 1.38874, 1.38874, 1.38874, 1.38874, 1.38874, 1.38874, 1.38874, 1.38874, 1.38874)
+Actual <- c(3.944094, 3.710476, 3.580334, 3.813830, 3.761116, 3.667450, 3.542495, 3.541055, 3.572956, 3.297843, 3.435400)
+
+# Calculate R-square
+r2 <- cor(Actual, pred6)^2
+print(paste("R2:", r2))
+
+# Calculate NSE
+nse <- NSE(pred6, Actual)
+print(paste("NSE:", nse))
+
+# Calculate KGE
+kge <- KGE(pred6, Actual)
+print(paste("KGE:", kge))
+
+# Print the metrics
+cat("R-squared:", r_squared, "\n")
+cat("NSE:", nse, "\n")
+cat("KGE:", kge, "\n")
+# Convert to vectors if they are not
+pred5 <- as.vector(pred5)
+test_data_exp <- as.vector(test_data$exp)
+
+# Ensure they have the same length
+if (length(pred5) == length(test_data_exp)) {
+  # Calculate NSE
+  nse <- NSE(pred5, test_data_exp)
+  print(paste("NSE:", nse))
+  
+  # Calculate KGE
+  kge <- KGE(pred5, test_data_exp)
+  print(paste("KGE:", kge))
+  
+  # Calculate R2
+  r2 <- cor(test_data_exp, pred6)^2
+  print(paste("R2:", r2))
+} else {
+  stop("The dimensions of the predicted and observed data do not match.")
+}
+length(pred5)
+
+#Plots (Boxlots, Taylor Diagram etc)
+install.packages("plotly")
+library(plotly)
+sd(test_data$exp)
+mean(test_data$exp)
+# Taylor Diagram 
+models <- c("EMD-SVM", "EMD-Random Forest", "EMD-Naïve Base", "EMD-ANN", "EMD-KNN")
+rmse <- c(0.207, 0.200, 0.316, 0.105, 0.254)
+mae <- c(0.185, 0.197, 0.283, 0.100, 0.198)
+mape <- c(5.261, 5.454, 7.750, 2.833, 5.890)
+nse <- c(-1.682, -14.3172, -168.2986, 0.8833, -3.595)
+kge <- c(0.572, 0.392, 0, 0.8220, -0.348)
+r2 <- c(0.954, 0.551, 0, 0.9930, 0.1769)
+
+# Reference statistics
+ref_sd <- 0.180 # Example standard deviation for reference
+ref_corr <- 1  # Correlation with itself
+
+# Compute statistics for Taylor Diagram
+compute_taylor_stats <- function(sd, corr) {
+  # Compute RMSE (distance to reference)
+  rmse <- sqrt((sd - ref_sd)^2 + (1 - corr)^2)
+  return(rmse)
+}
+
+# Calculate Taylor statistics for models
+model_stats <- data.frame(
+  Model = models,
+  SD = rmse,  # Use RMSE as an approximation for SD in this example
+  Correlation = r2,  # Use R2 as an approximation for correlation in this example
+  RMSE = compute_taylor_stats(rmse, r2)
+)
+
+# Plotting Taylor Diagram
+plot_ly() %>%
+  add_trace(
+    type = 'scatterpolar',
+    mode = 'markers',
+    r = model_stats$SD,
+    theta = acos(model_stats$Correlation) * 180 / pi,
+    text = model_stats$Model,
+    marker = list(size = 10)
+  ) %>%
+  layout(
+    polar = list(
+      radialaxis = list(
+        title = 'Standard Deviation',
+        range = c(0, max(model_stats$SD))
+      ),
+      angularaxis = list(
+        title = 'Correlation',
+        tickvals = seq(0, 180, by = 45),
+        ticktext = c('1.0', '0.7', '0.5', '0.3', '0.0')
+      )
+    ),
+    title = 'Taylor Diagram'
+  )
+#Boxplot and Violing Plot
+# Load necessary libraries
+library(ggplot2)
+library(tidyr)
+
+# Data
+models <- c("EMD-SVM", "EMD-Random Forest", "EMD-Naïve Base", "EMD-ANN", "EMD-KNN")
+rmse <- c(0.207, 0.200, 0.316, 0.105, 0.254)
+mae <- c(0.185, 0.197, 0.283, 0.100, 0.198)
+mape <- c(5.261, 5.454, 7.750, 2.833, 5.890)
+nse <- c(-1.682, -14.3172, -168.2986, 0.8833, -3.595)
+kge <- c(0.572, 0.392, 0, 0.8220, -0.348)
+r2 <- c(0.954, 0.551, 0, 0.9930, 0.1769)
+
+# Create a data frame
+df <- data.frame(
+  Model = models,
+  RMSE = rmse,
+  MAE = mae,
+  MAPE = mape,
+  NSE = nse,
+  KGE = kge,
+  R2 = r2
+)
+
+# Reshape data for plotting
+df_long <- df %>%
+  pivot_longer(cols = -Model, names_to = "Metric", values_to = "Value")
+# Boxplot
+ggplot(df_long, aes(x = Metric, y = Value, fill = Metric)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "",
+       x = "Metric",
+       y = "Value") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# Violin plot
+ggplot(df_long, aes(x = Metric, y = Value, fill = Metric)) +
+  geom_violin(trim = FALSE) +
+  theme_minimal() +
+  labs(title = "",
+       x = "Metric",
+       y = "Value") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# Load necessary libraries
+library(ggplot2)
+library(tidyr)
+
+# Data
+models <- c("EMD-SVM", "EMD-Random Forest", "EMD-Naïve Base", "EMD-ANN", "EMD-KNN")
+rmse <- c(0.207, 0.200, 0.316, 0.105, 0.254)
+mae <- c(0.185, 0.197, 0.283, 0.100, 0.198)
+mape <- c(5.261, 5.454, 7.750, 2.833, 5.890)
+nse <- c(-1.682, -14.3172, -168.2986, 0.8833, -3.595)
+kge <- c(0.572, 0.392, 0, 0.8220, -0.348)
+r2 <- c(0.954, 0.551, 0, 0.9930, 0.1769)
+
+# Combine into a data frame
+df <- data.frame(
+  Model = rep(models, each = 6),  # Repeat each model for each metric
+  Metric = rep(c("RMSE", "MAE", "MAPE", "NSE", "KGE", "R2"), times = 5),
+  Value = c(rmse, mae, mape, nse, kge, r2)
+)
+
+# Reshape data
+df_long <- df %>%
+  pivot_longer(cols = -Model, names_to = "Metric", values_to = "Value")
+# Boxplot for each metric across models
+ggplot(df, aes(x = Model, y = Value, fill = Metric)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Boxplot of Performance Metrics by Model",
+       x = "Model",
+       y = "Value") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~ Metric, scales = "free_y")  # Separate plots for each metric
+# Load necessary libraries
+library(ggplot2)
+library(tidyr)
+
+# Define the data
+models <- c("EMD-SVM", "EMD-Random Forest", "EMD-Naive Base", "EMD-ANN", "EMD-KNN")
+rmse <- c(0.207, 0.200, 0.316, 0.105, 0.254)
+mae <- c(0.185, 0.197, 0.283, 0.100, 0.198)
+mape <- c(5.261, 5.454, 7.750, 2.833, 5.890)
+nse <- c(-1.682, -14.3172, -168.2986, 0.8833, -3.595)
+kge <- c(0.572, 0.392, 0, 0.8220, -0.348)
+r2 <- c(0.954, 0.551, 0, 0.9930, 0.1769)
+
+# Create a data frame directly
+df <- data.frame(
+  Model = rep(models, times = 6),  # Repeat each model for each metric
+  Metric = factor(rep(c("RMSE", "MAE", "MAPE", "NSE", "KGE", "R2"), each = 5)),
+  Value = c(rmse, mae, mape, nse, kge, r2)
+)
+# Create the boxplot
+ggplot(df, aes(x = Model, y = Value, fill = Metric)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "Performance Metrics by Model",
+       x = "Model",
+       y = "Metric Value") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
